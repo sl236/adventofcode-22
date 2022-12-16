@@ -49,8 +49,6 @@ def solve(actors, unopened, released, rate, tick, limit):
     tick = new_tick
 
     if tick >= limit:
-        if global_best < released:
-            global_best = released
         global_best = max(global_best, released)
         return
 
@@ -70,8 +68,7 @@ def solve(actors, unopened, released, rate, tick, limit):
 
     if not unopened:
         released += rate * (limit-tick)
-        if global_best < released:
-            global_best = released
+        global_best = max(global_best, released)
         return
 
     moveset = []
@@ -80,18 +77,16 @@ def solve(actors, unopened, released, rate, tick, limit):
             moveset.append([actor])
             continue
 
-        moves = []
+        moves = [(idx, limit)]
         for cand in unopened:
             new_tick = tick + valves[actor[0]].distances[cand]
             if new_tick <= limit:
                 moves.append( (cand, new_tick) )
-        moves.append( (idx, limit) )
         moveset.append(moves)
 
     for combo in itertools.product( *moveset ):
-        if len(set(actor[0] for actor in combo)) < len(actors):
-            continue
-        solve( combo, unopened, released, rate, tick, limit )
+        if len(set(actor[0] for actor in combo)) == len(actors):
+            solve( combo, unopened, released, rate, tick, limit )
 
 
 useful_valves = tuple(sorted(v for v in valves if valves[v].rate > 0))
