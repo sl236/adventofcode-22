@@ -6,6 +6,7 @@ board = []
 path = None
 
 mw = 0
+face_len = None
 for line in fileinput.input():
     if not line.strip():
         path = ''
@@ -17,9 +18,13 @@ for line in fileinput.input():
     else:
         board.append(line.rstrip())
         mw = max(mw, len(line.rstrip()))
+        face_len = len(line.strip()) if face_len is None else min(face_len, len(line.strip()))
 
 for i in range(len(board)):
     board[i] = board[i] + (' ' * (mw-len(board[i])))
+
+for x in range(mw):
+    face_len = min(face_len, len(''.join( board[y][x] for y in range(len(board))).strip()))
 
 facing_ofs = [(1, 0), (0, 1), (-1, 0), (0, -1)]
 
@@ -77,11 +82,6 @@ def solve( step ):
 pos, facing = solve(step)
 
 print("Part 1: {}".format(1000*(pos[1]+1)+4*(pos[0]+1)+facing))
-
-if len(board) < 50:
-    face_len = 4
-else:
-    face_len = 50
 
 face_map = []
 face_count = 0
