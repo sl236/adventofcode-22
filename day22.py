@@ -48,14 +48,11 @@ def move(pos, facing, step):
         raise RuntimeError("could not locate a place to stand")
     return pos, facing
 
-trace = [ [c for c in row] for row in board ]
-
 LOC = ("right", "bottom", "left", "top")
 REL = ("left of", "above", "right of", "below")
 DIR = ("right", "down", "left", "up")
 
 def solve( step ):
-    global trace
     pos, facing = ((0, 0), 0)
     while tile(pos) == ' ':
         pos = (pos[0]+1, pos[1])
@@ -67,24 +64,17 @@ def solve( step ):
             dist += path[pidx]
             pidx += 1
         if dist:
-            #print("{}: move {} {}".format(pos, dist, DIR[facing]))
             for _ in range( int(dist) ):
-                trace[pos[1]][pos[0]] = '>v<^'[facing]
                 pos, facing = move(pos, facing, step)
 
         rot = ''
         if pidx < len(path):
             rot = path[pidx]
             facing = (facing + (1 if path[pidx] == 'R' else 3)) % 4
-            #print("{}: rotate {}; now facing {}".format(pos, rot, DIR[facing]))
             pidx += 1
     return pos, facing
 
 pos, facing = solve(step)
-
-#print(dist, rot, pos[0]+1, pos[1]+1, facing)
-#for row in trace:
-#    print( ''.join(row) )
 
 print("Part 1: {}".format(1000*(pos[1]+1)+4*(pos[0]+1)+facing))
 
@@ -108,8 +98,11 @@ for y in range(0, len(board), face_len):
             face_pos.append((x//face_len, y//face_len))
     face_map.append(row)
 
-for row in face_map:
-    print(row)
+#for row in face_map:
+#    print(row)
+
+def cubestep(pos, facing):
+    return adjmap.get( (pos, facing), (add(pos, facing_ofs[facing]), facing) )
 
 adjmap = {}
 
@@ -121,12 +114,13 @@ def check(pos, b):
 adj = [[None for _ in range(4)] for _ in range(6)]
 edges_matched = 0
 
+# fill out initial adjacencies
 for face in range(6):
     for facing in range(4):
         x, y = add(face_pos[face], facing_ofs[facing])
         if check((x,y),face_map) and face_map[y][x] != ' ':
             cand = int(face_map[y][x])
-            print("{} is {} {}".format( face, REL[facing], cand ) )
+            #print("{} is {} {}".format( face, REL[facing], cand ) )
             x = face_pos[face][0] * face_len
             y = face_pos[face][1] * face_len
             for d in range(face_len):
@@ -138,9 +132,8 @@ for face in range(6):
             adj[face][facing] = (cand, (facing+2)%4, 0, 0)
             edges_matched += 1
 
-
-expected = [0,0,0,0,1,0,0,1,0,1,0,1,0,0] if len(board)>20 else [0,1,1,0,1,1,1,1,1,1,1,1,1,1]
-
+# use adjacency map to locate pairs of nodes sharing a common neighbour on edges 90 degrees away from edges we don't yet know the adjacency of
+# such edges must be adjacent to each other, so use them to fill the adjacency map further until there is nothing else to find
 work = True
 while work:
     work = False
@@ -163,25 +156,36 @@ while work:
                     if adj[destface][(entrydir+2)%4] is not None and adj[destface][(entrydir+2)%4][0] != face:
                         continue
 
-                    #print("no direct adjacency to {} edge of {}; checking {}".format(LOC[facing], face, LOC[adjdir]))
-                    #print(" -> checking {}".format(LOC[cdir]))
-                    #print("because {} is {} {}".format( face, REL[adjdir], adjface ) )
-                    #print(" and {} is {} {}".format( adjface, REL[cdir], destface ) )
-
-                    # to calculate this correctly involves walking the perimeter, which is awkward. hardwire instead
-                    flip = expected.pop(0)
-                    #print(" {}'s {} edge touches {}'s {} edge; distance {}; exiting {} enters {}; {}".format( face, LOC[facing], destface, LOC[(entrydir+2)%4], c+ac, DIR[facing], DIR[entrydir], "flipped" if flip else "unflipped" ))
-
                     F = face_len-1
                     exits =   ((F, 0, 0, 1), (0, 1, F, 0), (0, 0, 0, 1), (0, 1, 0, 0))
-                    entries = ((F, 0, F, -1), (F, -1, F, 0), (0, 0, F, -1), (F, -1, 0, 0)) if flip else exits
+                    entries = exits
                     sxs, sx, sys, sy = exits[facing]
                     srcx = face_pos[face][0] * face_len + sxs
                     srcy = face_pos[face][1] * face_len + sys
 
-                    dxs, dx, dys, dy = entries[(entrydir+2)%4]
+                    dxs, dx, dys, dy = exits[(entrydir+2)%4]
                     destx = face_pos[destface][0] * face_len + dxs
                     desty = face_pos[destface][1] * face_len + dys
+
+                    # at least one corner on each edge must touch a shared face. Find it; if the direction towards that corner
+                    # is increading coordinates for one side and not the other, we need to flip the direction of the walk along the shared edge
+                    flip = False
+                    edge_ends = ((((0, 0), 3), ((0, F), 1)), (((0, 0), 2), ((F, 0), 0)))
+                    for so in edge_ends[facing % 2]:
+                        for do in edge_ends[entrydir % 2]:
+                            a = tuple(c/face_len for c in (cubestep(add((srcx, srcy), so[0]), so[1]))[0])
+                            b = tuple(c/face_len for c in (cubestep(add((destx, desty), do[0]), do[1]))[0])
+                            if a == b and (so[1] < 2) != (do[1] < 2):
+                                entries = ((F, 0, F, -1), (F, -1, F, 0), (0, 0, F, -1), (F, -1, 0, 0))
+                                dxs, dx, dys, dy = entries[(entrydir+2)%4]
+                                destx = face_pos[destface][0] * face_len + dxs
+                                desty = face_pos[destface][1] * face_len + dys
+                                flip = True
+
+                        if flip:
+                            break
+
+                    # print(" {}'s {} edge touches {}'s {} edge; distance {}; exiting {} enters {}; cdir={}; {}".format( face, LOC[facing], destface, LOC[(entrydir+2)%4], c+ac, DIR[facing], DIR[entrydir], DIR[cdir], "flipped" if flip else "unflipped" ))
 
                     adj[face][facing] = destface, entrydir, c+1, flip
                     for d in range(face_len):
@@ -195,14 +199,5 @@ while work:
                     edges_matched += 1
                     break
 
-trace = [ [c for c in row] for row in board ]
-
-def cubestep(pos, facing):
-    return adjmap.get( (pos, facing), (add(pos, facing_ofs[facing]), facing) )
-
 pos, facing = solve(cubestep)
-
-#for row in trace:
-#    print( ''.join(row) )
-
 print("Part 2: {}".format(1000*(pos[1]+1)+4*(pos[0]+1)+facing))
