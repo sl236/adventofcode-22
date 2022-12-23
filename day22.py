@@ -106,7 +106,7 @@ def cubestep(pos, facing):
 
 adjmap = {}
 
-def check(pos, b):
+def in_bounds(pos, b):
     y = (pos[1]+len(b)) % len(b)
     x = (pos[0]+len(b[y])) % len(b[y])
     return (pos[0] == x) and (pos[1] == y)
@@ -118,7 +118,7 @@ edges_matched = 0
 for face in range(6):
     for facing in range(4):
         x, y = add(face_pos[face], facing_ofs[facing])
-        if check((x,y),face_map) and face_map[y][x] != ' ':
+        if in_bounds((x,y),face_map) and face_map[y][x] != ' ':
             cand = int(face_map[y][x])
             #print("{} is {} {}".format( face, REL[facing], cand ) )
             x = face_pos[face][0] * face_len
@@ -158,7 +158,6 @@ while work:
 
                     F = face_len-1
                     exits =   ((F, 0, 0, 1), (0, 1, F, 0), (0, 0, 0, 1), (0, 1, 0, 0))
-                    entries = exits
                     sxs, sx, sys, sy = exits[facing]
                     srcx = face_pos[face][0] * face_len + sxs
                     srcy = face_pos[face][1] * face_len + sys
@@ -181,9 +180,6 @@ while work:
                                 destx = face_pos[destface][0] * face_len + dxs
                                 desty = face_pos[destface][1] * face_len + dys
                                 flip = True
-
-                        if flip:
-                            break
 
                     # print(" {}'s {} edge touches {}'s {} edge; distance {}; exiting {} enters {}; cdir={}; {}".format( face, LOC[facing], destface, LOC[(entrydir+2)%4], c+ac, DIR[facing], DIR[entrydir], DIR[cdir], "flipped" if flip else "unflipped" ))
 
